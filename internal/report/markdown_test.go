@@ -15,9 +15,6 @@ func date(s string) time.Time {
 }
 
 func TestRender_ContainsHeadings(t *testing.T) {
-	from := date("2026-05-12")
-	to := date("2026-05-26")
-
 	items := []azdevops.WorkItem{
 		{ID: 1, Title: "Story One", State: "Active", Type: "User Story", Tags: "sprint-23"},
 		{ID: 2, Title: "Task Two", State: "Closed", Type: "Task", Tags: "sprint-23"},
@@ -29,10 +26,10 @@ func TestRender_ContainsHeadings(t *testing.T) {
 		{ShortID: "abc1234", Message: "Fix bug", RepoName: "my-repo", Date: date("2026-05-21")},
 	}
 
-	out := report.Render(from, to, items, prs, commits)
+	out := report.Render("Team A\\Sprint 68", items, prs, commits)
 
 	checks := []string{
-		"# Work Summary",
+		"# Work Summary — Team A\\Sprint 68",
 		"## Work Items",
 		"### User Story",
 		"### Task",
@@ -51,10 +48,7 @@ func TestRender_ContainsHeadings(t *testing.T) {
 }
 
 func TestRender_EmptySections(t *testing.T) {
-	from := date("2026-05-12")
-	to := date("2026-05-26")
-
-	out := report.Render(from, to, nil, nil, nil)
+	out := report.Render("Team A\\Sprint 68", nil, nil, nil)
 
 	if !strings.Contains(out, "# Work Summary") {
 		t.Error("missing title")
@@ -65,16 +59,13 @@ func TestRender_EmptySections(t *testing.T) {
 }
 
 func TestRender_GroupsByType(t *testing.T) {
-	from := date("2026-05-12")
-	to := date("2026-05-26")
-
 	items := []azdevops.WorkItem{
 		{ID: 1, Title: "Bug One", State: "Active", Type: "Bug"},
 		{ID: 2, Title: "Story One", State: "Active", Type: "User Story"},
 		{ID: 3, Title: "Task One", State: "Active", Type: "Task"},
 	}
 
-	out := report.Render(from, to, items, nil, nil)
+	out := report.Render("Team A\\Sprint 68", items, nil, nil)
 
 	bugIdx := strings.Index(out, "### Bug")
 	storyIdx := strings.Index(out, "### User Story")
@@ -82,5 +73,19 @@ func TestRender_GroupsByType(t *testing.T) {
 
 	if bugIdx == -1 || storyIdx == -1 || taskIdx == -1 {
 		t.Fatalf("missing type headings in:\n%s", out)
+	}
+}
+
+func TestRender_TitleReflectsSprints(t *testing.T) {
+	out := report.Render("Team A\\Sprint 67, Team A\\Sprint 68", nil, nil, nil)
+	if !strings.Contains(out, "Team A\\Sprint 67, Team A\\Sprint 68") {
+		t.Errorf("expected sprint names in title, got:\n%s", out)
+	}
+}
+
+func TestRender_TitleReflectsDateRange(t *testing.T) {
+	out := report.Render("Nov 26, 2025 – May 26, 2026", nil, nil, nil)
+	if !strings.Contains(out, "Nov 26, 2025 – May 26, 2026") {
+		t.Errorf("expected date range in title, got:\n%s", out)
 	}
 }

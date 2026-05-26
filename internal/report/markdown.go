@@ -4,16 +4,16 @@ import (
 	"fmt"
 	"sort"
 	"strings"
-	"time"
 
 	"github.com/pathcl/dailyup/internal/azdevops"
 )
 
-// Render produces a Markdown summary of work done between from and to.
-func Render(from, to time.Time, items []azdevops.WorkItem, prs []azdevops.PullRequest, commits []azdevops.Commit) string {
+// Render produces a Markdown summary. title describes what was queried
+// (sprint names or a date range) and is used verbatim in the heading.
+func Render(title string, items []azdevops.WorkItem, prs []azdevops.PullRequest, commits []azdevops.Commit) string {
 	var sb strings.Builder
 
-	fmt.Fprintf(&sb, "# Work Summary — %s – %s\n\n", from.Format("Jan 2, 2006"), to.Format("Jan 2, 2006"))
+	fmt.Fprintf(&sb, "# Work Summary — %s\n\n", title)
 
 	sb.WriteString("## Work Items\n\n")
 	if len(items) == 0 {

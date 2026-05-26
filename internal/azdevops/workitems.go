@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"net/http"
 	"strings"
+	"time"
 )
 
 // WorkItem represents a single Azure DevOps work item.
@@ -21,10 +22,14 @@ type WorkItem struct {
 }
 
 // WorkItemOpts controls how work items are queried.
+// Exactly one of Sprints or Since should be set; if neither is set,
+// @CurrentIteration is used.
 type WorkItemOpts struct {
-	// Sprint is the iteration name, e.g. "Sprint 68".
-	// Empty string means @CurrentIteration (the active sprint for the team).
-	Sprint string
+	// Sprints filters by iteration path. One sprint = UNDER, multiple = IN.
+	// Empty means @CurrentIteration.
+	Sprints []string
+	// Since filters by changed date instead of sprint. Mutually exclusive with Sprints.
+	Since *time.Time
 	// Tags optionally narrows results to items with at least one matching tag.
 	Tags []string
 	// AssignedTo optionally filters by assignee. Use "@Me" for the current user,
@@ -114,12 +119,21 @@ func buildQuery(c *Client, opts WorkItemOpts, tag string) string {
 	var conditions []string
 	conditions = append(conditions, fmt.Sprintf("[System.TeamProject] = '%s'", c.Project()))
 
-	// Sprint / iteration path
-	if opts.Sprint == "" {
-		conditions = append(conditions, "[System.IterationPath] UNDER @CurrentIteration")
-	} else {
-		iterPath := fmt.Sprintf("%s\\%s", c.Project(), opts.Sprint)
+	// Sprint / iteration path / date range
+	switch {
+	case len(opts.Sprints) == 1:
+		iterPath := fmt.Sprintf("%s\\%s", c.Project(), opts.Sprints[0])
 		conditions = append(conditions, fmt.Sprintf("[System.IterationPath] UNDER '%s'", iterPath))
+	case len(opts.Sprints) > 1:
+		paths := make([]string, len(opts.Sprints))
+		for i, s := range opts.Sprints {
+			paths[i] = fmt.Sprintf("'%s\\%s'", c.Project(), s)
+		}
+		conditions = append(conditions, fmt.Sprintf("[System.IterationPath] IN (%s)", strings.Join(paths, ", ")))
+	case opts.Since != nil:
+		conditions = append(conditions, fmt.Sprintf("[System.ChangedDate] >= '%s'", opts.Since.Format("2006-01-02")))
+	default:
+		conditions = append(conditions, "[System.IterationPath] UNDER @CurrentIteration")
 	}
 
 	if tag != "" {
