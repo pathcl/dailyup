@@ -20,6 +20,7 @@ var (
 	debug          bool
 	noPullRequests bool
 	noCommits      bool
+	types          []string
 )
 
 var rootCmd = &cobra.Command{
@@ -41,6 +42,7 @@ func init() {
 	summaryCmd.Flags().BoolVar(&debug, "debug", false, "print raw HTTP requests and responses to stderr")
 	summaryCmd.Flags().BoolVar(&noPullRequests, "no-pull-requests", false, "skip fetching pull requests")
 	summaryCmd.Flags().BoolVar(&noCommits, "no-commits", false, "skip fetching commits")
+	summaryCmd.Flags().StringSliceVar(&types, "types", nil, `limit work item types, e.g. --types "Feature,User Story,Task"`)
 	rootCmd.AddCommand(summaryCmd)
 }
 
@@ -81,6 +83,7 @@ func runSummary(cmd *cobra.Command, args []string) error {
 		Sprint:     sprintName,
 		Tags:       cfg.Tags,
 		AssignedTo: cfg.AssignedTo,
+		Types:      types,
 	}
 
 	var (
