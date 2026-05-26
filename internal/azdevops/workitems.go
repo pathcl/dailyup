@@ -29,6 +29,9 @@ type WorkItemOpts struct {
 	// AssignedTo optionally filters by assignee. Use "@Me" for the current user,
 	// or a display name / email for a specific person. Empty = no filter.
 	AssignedTo string
+	// Types optionally limits results to specific work item types,
+	// e.g. []string{"Feature", "User Story", "Task"}. Empty = all types.
+	Types []string
 }
 
 type wiqlRequest struct {
@@ -128,6 +131,16 @@ func buildQuery(c *Client, opts WorkItemOpts, tag string) string {
 		} else {
 			conditions = append(conditions, fmt.Sprintf("[System.AssignedTo] = '%s'", opts.AssignedTo))
 		}
+	}
+
+	if len(opts.Types) == 1 {
+		conditions = append(conditions, fmt.Sprintf("[System.WorkItemType] = '%s'", opts.Types[0]))
+	} else if len(opts.Types) > 1 {
+		quoted := make([]string, len(opts.Types))
+		for i, t := range opts.Types {
+			quoted[i] = fmt.Sprintf("'%s'", t)
+		}
+		conditions = append(conditions, fmt.Sprintf("[System.WorkItemType] IN (%s)", strings.Join(quoted, ", ")))
 	}
 
 	return fmt.Sprintf(
