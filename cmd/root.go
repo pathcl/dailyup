@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"strings"
 	"sync"
 	"time"
 
@@ -16,7 +17,7 @@ import (
 var (
 	cfgPath        string
 	weeks          int
-	sprintName     string
+	sprintNames    []string
 	assignedTo     string
 	debug          bool
 	noPullRequests bool
@@ -38,7 +39,7 @@ var summaryCmd = &cobra.Command{
 func init() {
 	summaryCmd.Flags().StringVar(&cfgPath, "config", config.DefaultPath(), "path to config file")
 	summaryCmd.Flags().IntVar(&weeks, "weeks", 0, "look-back window for PRs/commits (overrides config)")
-	summaryCmd.Flags().StringVar(&sprintName, "sprint", "", `sprint name, e.g. "Sprint 68" (default: current sprint)`)
+	summaryCmd.Flags().StringArrayVar(&sprintNames, "sprint", nil, `sprint name(s), e.g. --sprint "Sprint 68" --sprint "Sprint 67" (default: current sprint)`)
 	summaryCmd.Flags().StringVar(&assignedTo, "assigned-to", "", `filter work items by person, e.g. "@Me" or display name (overrides config)`)
 	summaryCmd.Flags().BoolVar(&debug, "debug", false, "print raw HTTP requests and responses to stderr")
 	summaryCmd.Flags().BoolVar(&noPullRequests, "no-pull-requests", false, "skip fetching pull requests")
@@ -84,7 +85,24 @@ func runSummary(cmd *cobra.Command, args []string) error {
 	}
 
 	since := time.Now().UTC().Add(-time.Duration(cfg.Weeks) * 7 * 24 * time.Hour)
-	to := time.Now().UTC()
+
+	// Build report title and work item opts based on what was requested.
+	var title string
+	var wiOpts azdevops.WorkItemOpts
+	switch {
+	case len(sprintNames) > 0:
+		title = strings.Join(sprintNames, ", ")
+		wiOpts = azdevops.WorkItemOpts{Sprints: sprintNames}
+	case weeks > 0:
+		title = fmt.Sprintf("%s – %s", since.Format("Jan 2, 2006"), time.Now().UTC().Format("Jan 2, 2006"))
+		wiOpts = azdevops.WorkItemOpts{Since: &since}
+	default:
+		title = "Current Sprint"
+		wiOpts = azdevops.WorkItemOpts{}
+	}
+	wiOpts.Tags = cfg.Tags
+	wiOpts.AssignedTo = cfg.AssignedTo
+	wiOpts.Types = types
 
 	slog.Debug("authenticating via az cli", "org", cfg.Organization)
 	client, err := azdevops.NewClientFromAzCLI(cfg.Organization, cfg.Project, debug)
@@ -92,13 +110,6 @@ func runSummary(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("auth: %w", err)
 	}
 	slog.Debug("authenticated")
-
-	wiOpts := azdevops.WorkItemOpts{
-		Sprint:     sprintName,
-		Tags:       cfg.Tags,
-		AssignedTo: cfg.AssignedTo,
-		Types:      types,
-	}
 
 	var (
 		wg                  sync.WaitGroup
@@ -108,7 +119,7 @@ func runSummary(cmd *cobra.Command, args []string) error {
 		wiErr, prErr, cmErr error
 	)
 
-	slog.Debug("fetching work items", "sprint", wiOpts.Sprint, "tags", wiOpts.Tags, "assignedTo", wiOpts.AssignedTo)
+	slog.Debug("fetching work items", "sprints", wiOpts.Sprints, "tags", wiOpts.Tags, "assignedTo", wiOpts.AssignedTo)
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
@@ -154,6 +165,6 @@ func runSummary(cmd *cobra.Command, args []string) error {
 		}
 	}
 
-	fmt.Print(report.Render(since, to, workItems, prs, commits))
+	fmt.Print(report.Render(title, workItems, prs, commits))
 	return nil
 }
