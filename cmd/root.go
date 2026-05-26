@@ -13,11 +13,13 @@ import (
 )
 
 var (
-	cfgPath    string
-	weeks      int
-	sprintName string
-	assignedTo string
-	debug      bool
+	cfgPath        string
+	weeks          int
+	sprintName     string
+	assignedTo     string
+	debug          bool
+	noPullRequests bool
+	noCommits      bool
 )
 
 var rootCmd = &cobra.Command{
@@ -37,6 +39,8 @@ func init() {
 	summaryCmd.Flags().StringVar(&sprintName, "sprint", "", `sprint name, e.g. "Sprint 68" (default: current sprint)`)
 	summaryCmd.Flags().StringVar(&assignedTo, "assigned-to", "", `filter work items by person, e.g. "@Me" or display name (overrides config)`)
 	summaryCmd.Flags().BoolVar(&debug, "debug", false, "print raw HTTP requests and responses to stderr")
+	summaryCmd.Flags().BoolVar(&noPullRequests, "no-pull-requests", false, "skip fetching pull requests")
+	summaryCmd.Flags().BoolVar(&noCommits, "no-commits", false, "skip fetching commits")
 	rootCmd.AddCommand(summaryCmd)
 }
 
@@ -58,6 +62,12 @@ func runSummary(cmd *cobra.Command, args []string) error {
 	if assignedTo != "" {
 		cfg.AssignedTo = assignedTo
 	}
+	if noPullRequests {
+		cfg.PullRequests = false
+	}
+	if noCommits {
+		cfg.Commits = false
+	}
 
 	since := time.Now().UTC().Add(-time.Duration(cfg.Weeks) * 7 * 24 * time.Hour)
 	to := time.Now().UTC()
@@ -74,26 +84,35 @@ func runSummary(cmd *cobra.Command, args []string) error {
 	}
 
 	var (
-		wg                    sync.WaitGroup
-		workItems             []azdevops.WorkItem
-		prs                   []azdevops.PullRequest
-		commits               []azdevops.Commit
-		wiErr, prErr, cmErr   error
+		wg                  sync.WaitGroup
+		workItems           []azdevops.WorkItem
+		prs                 []azdevops.PullRequest
+		commits             []azdevops.Commit
+		wiErr, prErr, cmErr error
 	)
 
-	wg.Add(3)
+	wg.Add(1)
 	go func() {
 		defer wg.Done()
 		workItems, wiErr = azdevops.FetchWorkItems(client, wiOpts)
 	}()
-	go func() {
-		defer wg.Done()
-		prs, prErr = azdevops.FetchPullRequests(client, since)
-	}()
-	go func() {
-		defer wg.Done()
-		commits, cmErr = azdevops.FetchCommits(client, cfg.Email, since)
-	}()
+
+	if cfg.PullRequests {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			prs, prErr = azdevops.FetchPullRequests(client, since)
+		}()
+	}
+
+	if cfg.Commits {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			commits, cmErr = azdevops.FetchCommits(client, cfg.Email, since)
+		}()
+	}
+
 	wg.Wait()
 
 	for _, e := range []error{wiErr, prErr, cmErr} {

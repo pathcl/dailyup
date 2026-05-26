@@ -12,10 +12,12 @@ import (
 type Config struct {
 	Organization string   `toml:"organization"`
 	Project      string   `toml:"project"`
-	Tags         []string `toml:"tags"`       // optional — narrows sprint results
-	AssignedTo   string   `toml:"assigned_to"` // optional — e.g. "@Me" or display name
-	Weeks        int      `toml:"weeks"`       // used for PRs/commits date window
-	Email        string   `toml:"email"`       // used for commit author filtering
+	Tags         []string `toml:"tags"`          // optional — narrows sprint results
+	AssignedTo   string   `toml:"assigned_to"`   // optional — e.g. "@Me" or display name
+	Weeks        int      `toml:"weeks"`         // used for PRs/commits date window
+	Email        string   `toml:"email"`         // used for commit author filtering
+	PullRequests bool     `toml:"pull_requests"` // fetch pull requests (default: true)
+	Commits      bool     `toml:"commits"`       // fetch commits (default: true)
 }
 
 // DefaultPath returns ~/.config/dailyup/config.toml.
@@ -42,6 +44,18 @@ func Load(path string) (*Config, error) {
 
 	if cfg.Weeks <= 0 {
 		cfg.Weeks = 2
+	}
+
+	// TOML omitted booleans decode as false; treat absence as enabled.
+	// Users must explicitly set pull_requests = false to disable.
+	var raw map[string]interface{}
+	if _, err := toml.DecodeFile(path, &raw); err == nil {
+		if _, set := raw["pull_requests"]; !set {
+			cfg.PullRequests = true
+		}
+		if _, set := raw["commits"]; !set {
+			cfg.Commits = true
+		}
 	}
 
 	return &cfg, nil
