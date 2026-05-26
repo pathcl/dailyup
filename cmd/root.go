@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"log/slog"
 	"os"
 	"sync"
 	"time"
@@ -52,11 +53,22 @@ func Execute() {
 	}
 }
 
+func setupLogger(debug bool) {
+	level := slog.LevelWarn
+	if debug {
+		level = slog.LevelDebug
+	}
+	slog.SetDefault(slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: level})))
+}
+
 func runSummary(cmd *cobra.Command, args []string) error {
+	setupLogger(debug)
+
 	cfg, err := config.Load(cfgPath)
 	if err != nil {
 		return err
 	}
+	slog.Debug("config loaded", "org", cfg.Organization, "project", cfg.Project, "tags", cfg.Tags)
 	if weeks > 0 {
 		cfg.Weeks = weeks
 	}
@@ -74,10 +86,12 @@ func runSummary(cmd *cobra.Command, args []string) error {
 	since := time.Now().UTC().Add(-time.Duration(cfg.Weeks) * 7 * 24 * time.Hour)
 	to := time.Now().UTC()
 
+	slog.Debug("authenticating via az cli", "org", cfg.Organization)
 	client, err := azdevops.NewClientFromAzCLI(cfg.Organization, cfg.Project, debug)
 	if err != nil {
 		return fmt.Errorf("auth: %w", err)
 	}
+	slog.Debug("authenticated")
 
 	wiOpts := azdevops.WorkItemOpts{
 		Sprint:     sprintName,
@@ -94,26 +108,42 @@ func runSummary(cmd *cobra.Command, args []string) error {
 		wiErr, prErr, cmErr error
 	)
 
+	slog.Debug("fetching work items", "sprint", wiOpts.Sprint, "tags", wiOpts.Tags, "assignedTo", wiOpts.AssignedTo)
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
 		workItems, wiErr = azdevops.FetchWorkItems(client, wiOpts)
+		if wiErr == nil {
+			slog.Debug("work items fetched", "count", len(workItems))
+		}
 	}()
 
 	if cfg.PullRequests {
+		slog.Debug("fetching pull requests", "since", since.Format("2006-01-02"))
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
 			prs, prErr = azdevops.FetchPullRequests(client, since)
+			if prErr == nil {
+				slog.Debug("pull requests fetched", "count", len(prs))
+			}
 		}()
+	} else {
+		slog.Debug("pull requests disabled, skipping")
 	}
 
 	if cfg.Commits {
+		slog.Debug("fetching commits", "since", since.Format("2006-01-02"), "author", cfg.Email)
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
 			commits, cmErr = azdevops.FetchCommits(client, cfg.Email, since)
+			if cmErr == nil {
+				slog.Debug("commits fetched", "count", len(commits))
+			}
 		}()
+	} else {
+		slog.Debug("commits disabled, skipping")
 	}
 
 	wg.Wait()
