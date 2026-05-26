@@ -17,6 +17,7 @@ var (
 	weeks      int
 	sprintName string
 	assignedTo string
+	debug      bool
 )
 
 var rootCmd = &cobra.Command{
@@ -35,6 +36,7 @@ func init() {
 	summaryCmd.Flags().IntVar(&weeks, "weeks", 0, "look-back window for PRs/commits (overrides config)")
 	summaryCmd.Flags().StringVar(&sprintName, "sprint", "", `sprint name, e.g. "Sprint 68" (default: current sprint)`)
 	summaryCmd.Flags().StringVar(&assignedTo, "assigned-to", "", `filter work items by person, e.g. "@Me" or display name (overrides config)`)
+	summaryCmd.Flags().BoolVar(&debug, "debug", false, "print raw HTTP requests and responses to stderr")
 	rootCmd.AddCommand(summaryCmd)
 }
 
@@ -60,7 +62,7 @@ func runSummary(cmd *cobra.Command, args []string) error {
 	since := time.Now().UTC().Add(-time.Duration(cfg.Weeks) * 7 * 24 * time.Hour)
 	to := time.Now().UTC()
 
-	client, err := azdevops.NewClientFromAzCLI(cfg.Organization, cfg.Project)
+	client, err := azdevops.NewClientFromAzCLI(cfg.Organization, cfg.Project, debug)
 	if err != nil {
 		return fmt.Errorf("auth: %w", err)
 	}
