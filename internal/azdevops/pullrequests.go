@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"time"
 )
@@ -55,9 +56,9 @@ func FetchPullRequests(c *Client, since time.Time) ([]PullRequest, error) {
 	for _, v := range result.Value {
 		created, err := time.Parse(time.RFC3339, v.CreationDate)
 		if err != nil {
-			// try millisecond variant Azure DevOps sometimes returns
 			created, err = time.Parse("2006-01-02T15:04:05.999999999Z", v.CreationDate)
 			if err != nil {
+				slog.Warn("skipping PR with unparseable date", "id", v.ID, "title", v.Title, "date", v.CreationDate)
 				continue
 			}
 		}

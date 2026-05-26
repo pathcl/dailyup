@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"strings"
 )
@@ -150,6 +151,7 @@ func buildQuery(c *Client, opts WorkItemOpts, tag string) string {
 }
 
 func runWIQL(c *Client, query string) ([]int, error) {
+	slog.Debug("running wiql", "query", query)
 	url := fmt.Sprintf("%s/_apis/wit/wiql?api-version=7.1", c.ProjectURL())
 	body, err := json.Marshal(wiqlRequest{Query: query})
 	if err != nil {

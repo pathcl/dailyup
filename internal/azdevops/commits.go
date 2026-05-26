@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"time"
@@ -42,12 +43,14 @@ func FetchCommits(c *Client, authorEmail string, since time.Time) ([]Commit, err
 		return nil, err
 	}
 
+	slog.Debug("scanning repos", "count", len(repos))
 	var all []Commit
 	for _, repo := range repos {
 		commits, err := listCommitsForRepo(c, repo.id, repo.name, authorEmail, since)
 		if err != nil {
 			return nil, err
 		}
+		slog.Debug("repo scanned", "repo", repo.name, "commits", len(commits))
 		all = append(all, commits...)
 	}
 	return all, nil

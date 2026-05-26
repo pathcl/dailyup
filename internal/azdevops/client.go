@@ -6,8 +6,8 @@ import (
 	"encoding/base64"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
-	"os"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/policy"
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
@@ -100,19 +100,18 @@ type debugTransport struct {
 }
 
 func (t *debugTransport) RoundTrip(req *http.Request) (*http.Response, error) {
-	fmt.Fprintf(os.Stderr, "\n[debug] --> %s %s\n", req.Method, req.URL)
+	slog.Debug("http request", "method", req.Method, "url", req.URL.String())
 
 	resp, err := t.wrapped.RoundTrip(req)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "[debug] <-- error: %v\n", err)
+		slog.Debug("http error", "error", err)
 		return nil, err
 	}
 
 	body, _ := io.ReadAll(resp.Body)
 	resp.Body.Close()
-	fmt.Fprintf(os.Stderr, "[debug] <-- %d\n%s\n", resp.StatusCode, body)
+	slog.Debug("http response", "status", resp.StatusCode, "body", string(body))
 
-	// restore body so callers can still read it
 	resp.Body = io.NopCloser(bytes.NewReader(body))
 	return resp, nil
 }
