@@ -80,34 +80,59 @@ email        = "you@example.com"  # Your email address, used to filter commits b
 
 ### Configuration reference
 
-| Field          | Required | Default | Description |
-|----------------|----------|---------|-------------|
-| `organization` | yes      | —       | Azure DevOps org name (the subdomain in `dev.azure.com/<org>`) |
-| `project`      | yes      | —       | Team project name |
-| `tags`         | no       | —       | Work item tags to filter on; omit to get all items in the sprint |
-| `assigned_to`  | no       | —       | `@Me` for the current user, or a display name/email |
-| `weeks`        | no       | `2`     | Look-back window for PRs and commits |
-| `email`        | no       | —       | Your email, used as the commit author filter |
+| Field           | Required | Default | Description |
+|-----------------|----------|---------|-------------|
+| `organization`  | yes      | —       | Azure DevOps org name (the subdomain in `dev.azure.com/<org>`) |
+| `project`       | yes      | —       | Team project name |
+| `tags`          | no       | —       | Work item tags to filter on; omit to get all items in the sprint |
+| `assigned_to`   | no       | —       | `@Me` for the current user, or a display name/email |
+| `weeks`         | no       | `2`     | Date-based look-back window (used when no `--sprint` is given) |
+| `email`         | no       | —       | Your email, used as the commit author filter |
+| `pull_requests` | no       | `true`  | Set to `false` to skip fetching pull requests |
+| `commits`       | no       | `true`  | Set to `false` to skip fetching commits |
 
 ## Usage
 
 ```bash
-# Summarise the current sprint (uses @CurrentIteration)
+# Current sprint (uses @CurrentIteration)
 dailyup summary
 
-# Summarise a specific named sprint
-dailyup summary --sprint "Sprint 68"
+# Specific sprint
+dailyup summary --sprint "Team A\Sprint 68"
 
-# Override the assignee filter at runtime
-dailyup summary --sprint "Sprint 68" --assigned-to "@Me"
-dailyup summary --sprint "Sprint 68" --assigned-to "Jane Doe"
+# Multiple sprints — pass --sprint more than once
+dailyup summary --sprint "Team A\Sprint 67" --sprint "Team A\Sprint 68"
 
-# Override the PR/commit look-back window
-dailyup summary --weeks 1
+# Date-based fallback — last 6 months, no sprint boundary
+dailyup summary --weeks 26
+
+# Filter by assignee
+dailyup summary --sprint "Team A\Sprint 68" --assigned-to "@Me"
+dailyup summary --sprint "Team A\Sprint 68" --assigned-to "Jane Doe"
+
+# Skip pull requests or commits
+dailyup summary --no-pull-requests
+dailyup summary --no-pull-requests --no-commits
+
+# Print raw ADO responses for debugging
+dailyup summary --sprint "Team A\Sprint 68" --debug
 
 # Use a different config file
 dailyup summary --config /path/to/config.toml
 ```
+
+### How sprint and date filtering work
+
+`--sprint` and `--weeks` are mutually exclusive. The priority order is:
+
+| Condition | WIQL generated |
+|-----------|---------------|
+| `--sprint` given once | `[System.IterationPath] UNDER 'Project\Team A\Sprint 68'` |
+| `--sprint` given multiple times | `[System.IterationPath] IN ('Project\Team A\Sprint 67', 'Project\Team A\Sprint 68')` |
+| `--weeks 26` (no sprint) | `[System.ChangedDate] >= '2025-11-26'` |
+| neither flag | `[System.IterationPath] UNDER @CurrentIteration` |
+
+**Finding the right sprint name:** open any work item in ADO and look at the **Iteration** field. The sprint name is everything after the first `\`. For example, if Iteration shows `MyProject\Team A\Sprint 68`, pass `--sprint "Team A\Sprint 68"`.
 
 ### Output
 
