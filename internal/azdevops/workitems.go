@@ -1,0 +1,191 @@
+package azdevops
+
+import (
+	"bytes"
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
+	"strings"
+)
+
+// WorkItem represents a single Azure DevOps work item.
+type WorkItem struct {
+	ID    int
+	Title string
+	State string
+	Type  string
+	Tags  string
+}
+
+// WorkItemOpts controls how work items are queried.
+type WorkItemOpts struct {
+	// Sprint is the iteration name, e.g. "Sprint 68".
+	// Empty string means @CurrentIteration (the active sprint for the team).
+	Sprint string
+	// Tags optionally narrows results to items with at least one matching tag.
+	Tags []string
+	// AssignedTo optionally filters by assignee. Use "@Me" for the current user,
+	// or a display name / email for a specific person. Empty = no filter.
+	AssignedTo string
+}
+
+type wiqlRequest struct {
+	Query string `json:"query"`
+}
+
+type wiqlResponse struct {
+	WorkItems []struct {
+		ID int `json:"id"`
+	} `json:"workItems"`
+}
+
+type batchRequest struct {
+	IDs    []int    `json:"ids"`
+	Fields []string `json:"fields"`
+}
+
+type batchResponse struct {
+	Value []struct {
+		ID     int `json:"id"`
+		Fields struct {
+			Title      string `json:"System.Title"`
+			State      string `json:"System.State"`
+			Type       string `json:"System.WorkItemType"`
+			Tags       string `json:"System.Tags"`
+			AssignedTo string `json:"System.AssignedTo"`
+		} `json:"fields"`
+	} `json:"value"`
+}
+
+// FetchWorkItems queries work items in the given sprint, optionally narrowed by tags and assignee.
+func FetchWorkItems(c *Client, opts WorkItemOpts) ([]WorkItem, error) {
+	if len(opts.Tags) == 0 {
+		return fetchByIteration(c, opts)
+	}
+
+	// Run one WIQL per tag, deduplicate results.
+	seen := make(map[int]struct{})
+	var ids []int
+	for _, tag := range opts.Tags {
+		found, err := runWIQL(c, buildQuery(c, opts, tag))
+		if err != nil {
+			return nil, fmt.Errorf("wiql for tag %q: %w", tag, err)
+		}
+		for _, id := range found {
+			if _, dup := seen[id]; !dup {
+				seen[id] = struct{}{}
+				ids = append(ids, id)
+			}
+		}
+	}
+	if len(ids) == 0 {
+		return nil, nil
+	}
+	return fetchBatch(c, ids)
+}
+
+// fetchByIteration runs a single query with no tag filter.
+func fetchByIteration(c *Client, opts WorkItemOpts) ([]WorkItem, error) {
+	ids, err := runWIQL(c, buildQuery(c, opts, ""))
+	if err != nil {
+		return nil, err
+	}
+	if len(ids) == 0 {
+		return nil, nil
+	}
+	return fetchBatch(c, ids)
+}
+
+// buildQuery constructs the WIQL query string.
+// tag is optional; pass "" to omit the tag condition.
+func buildQuery(c *Client, opts WorkItemOpts, tag string) string {
+	var conditions []string
+	conditions = append(conditions, fmt.Sprintf("[System.TeamProject] = '%s'", c.Project()))
+
+	// Sprint / iteration path
+	if opts.Sprint == "" {
+		conditions = append(conditions, "[System.IterationPath] UNDER @CurrentIteration")
+	} else {
+		iterPath := fmt.Sprintf("%s\\%s", c.Project(), opts.Sprint)
+		conditions = append(conditions, fmt.Sprintf("[System.IterationPath] UNDER '%s'", iterPath))
+	}
+
+	if tag != "" {
+		conditions = append(conditions, fmt.Sprintf("[System.Tags] CONTAINS '%s'", tag))
+	}
+
+	if opts.AssignedTo != "" {
+		if opts.AssignedTo == "@Me" {
+			conditions = append(conditions, "[System.AssignedTo] = @Me")
+		} else {
+			conditions = append(conditions, fmt.Sprintf("[System.AssignedTo] = '%s'", opts.AssignedTo))
+		}
+	}
+
+	return fmt.Sprintf(
+		"SELECT [System.Id] FROM WorkItems WHERE %s ORDER BY [System.ChangedDate] DESC",
+		strings.Join(conditions, " AND "),
+	)
+}
+
+func runWIQL(c *Client, query string) ([]int, error) {
+	url := fmt.Sprintf("%s/_apis/wit/wiql?api-version=7.1", c.ProjectURL())
+	body, err := json.Marshal(wiqlRequest{Query: query})
+	if err != nil {
+		return nil, err
+	}
+	resp, err := c.HTTP().Post(url, "application/json", bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		b, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("wiql HTTP %d: %s", resp.StatusCode, b)
+	}
+	var result wiqlResponse
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, err
+	}
+	ids := make([]int, len(result.WorkItems))
+	for i, wi := range result.WorkItems {
+		ids[i] = wi.ID
+	}
+	return ids, nil
+}
+
+func fetchBatch(c *Client, ids []int) ([]WorkItem, error) {
+	url := fmt.Sprintf("%s/_apis/wit/workitemsbatch?api-version=7.1", c.OrgURL())
+	body, err := json.Marshal(batchRequest{
+		IDs:    ids,
+		Fields: []string{"System.Id", "System.Title", "System.State", "System.WorkItemType", "System.Tags", "System.AssignedTo"},
+	})
+	if err != nil {
+		return nil, err
+	}
+	resp, err := c.HTTP().Post(url, "application/json", bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		b, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("workitemsbatch HTTP %d: %s", resp.StatusCode, b)
+	}
+	var result batchResponse
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, err
+	}
+	items := make([]WorkItem, len(result.Value))
+	for i, v := range result.Value {
+		items[i] = WorkItem{
+			ID:    v.ID,
+			Title: v.Fields.Title,
+			State: v.Fields.State,
+			Type:  v.Fields.Type,
+			Tags:  v.Fields.Tags,
+		}
+	}
+	return items, nil
+}
