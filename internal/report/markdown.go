@@ -58,6 +58,9 @@ func writeWorkItems(sb *strings.Builder, items []azdevops.WorkItem) {
 			if item.Tags != "" {
 				fmt.Fprintf(sb, " — tags: %s", item.Tags)
 			}
+			if item.SprintCount > 1 {
+				fmt.Fprintf(sb, " — carried over %d sprints", item.SprintCount)
+			}
 			sb.WriteString("\n")
 		}
 		sb.WriteString("\n")

@@ -13,12 +13,13 @@ import (
 
 // WorkItem represents a single Azure DevOps work item.
 type WorkItem struct {
-	ID         int
-	Title      string
-	State      string
-	Type       string
-	Tags       string
-	AssignedTo string
+	ID          int
+	Title       string
+	State       string
+	Type        string
+	Tags        string
+	AssignedTo  string
+	SprintCount int // number of distinct sprints this item has been in
 }
 
 // WorkItemOpts controls how work items are queried.
@@ -214,6 +215,7 @@ func fetchBatch(c *Client, ids []int) ([]WorkItem, error) {
 		return nil, err
 	}
 	items := make([]WorkItem, len(result.Value))
+	allIDs := make([]int, len(result.Value))
 	for i, v := range result.Value {
 		items[i] = WorkItem{
 			ID:         v.ID,
@@ -223,6 +225,14 @@ func fetchBatch(c *Client, ids []int) ([]WorkItem, error) {
 			Tags:       v.Fields.Tags,
 			AssignedTo: v.Fields.AssignedTo.DisplayName,
 		}
+		allIDs[i] = v.ID
 	}
+
+	slog.Debug("fetching iteration history", "items", len(allIDs))
+	counts := fetchIterationCounts(c, allIDs)
+	for i := range items {
+		items[i].SprintCount = counts[items[i].ID]
+	}
+
 	return items, nil
 }
