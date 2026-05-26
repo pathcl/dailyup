@@ -1,10 +1,13 @@
 package azdevops
 
 import (
+	"bytes"
 	"context"
 	"encoding/base64"
 	"fmt"
+	"io"
 	"net/http"
+	"os"
 
 	"github.com/Azure/azure-sdk-for-go/sdk/azcore/policy"
 	"github.com/Azure/azure-sdk-for-go/sdk/azidentity"
@@ -19,6 +22,7 @@ type Client struct {
 	baseURL      string
 	organization string
 	project      string
+	debug        bool
 }
 
 // NewClientWithToken creates a Client using a pre-existing token (PAT or Bearer).
@@ -37,7 +41,7 @@ func NewClientWithToken(baseURL, organization, project, token string) *Client {
 }
 
 // NewClientFromAzCLI creates a Client by fetching a token via the Azure CLI credential.
-func NewClientFromAzCLI(organization, project string) (*Client, error) {
+func NewClientFromAzCLI(organization, project string, debug bool) (*Client, error) {
 	cred, err := azidentity.NewAzureCLICredential(nil)
 	if err != nil {
 		return nil, fmt.Errorf("azure cli credential: %w", err)
@@ -48,15 +52,19 @@ func NewClientFromAzCLI(organization, project string) (*Client, error) {
 	if err != nil {
 		return nil, fmt.Errorf("get azure devops token (run 'az login' first): %w", err)
 	}
-	transport := &authTransport{
+	var inner http.RoundTripper = &authTransport{
 		wrapped: http.DefaultTransport,
 		header:  "Bearer " + tok.Token,
 	}
+	if debug {
+		inner = &debugTransport{wrapped: inner}
+	}
 	return &Client{
-		httpClient:   &http.Client{Transport: transport},
+		httpClient:   &http.Client{Transport: inner},
 		baseURL:      "https://dev.azure.com",
 		organization: organization,
 		project:      project,
+		debug:        debug,
 	}, nil
 }
 
@@ -85,4 +93,26 @@ func (t *authTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	clone.Header.Set("Authorization", t.header)
 	clone.Header.Set("Content-Type", "application/json")
 	return t.wrapped.RoundTrip(clone)
+}
+
+type debugTransport struct {
+	wrapped http.RoundTripper
+}
+
+func (t *debugTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	fmt.Fprintf(os.Stderr, "\n[debug] --> %s %s\n", req.Method, req.URL)
+
+	resp, err := t.wrapped.RoundTrip(req)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "[debug] <-- error: %v\n", err)
+		return nil, err
+	}
+
+	body, _ := io.ReadAll(resp.Body)
+	resp.Body.Close()
+	fmt.Fprintf(os.Stderr, "[debug] <-- %d\n%s\n", resp.StatusCode, body)
+
+	// restore body so callers can still read it
+	resp.Body = io.NopCloser(bytes.NewReader(body))
+	return resp, nil
 }

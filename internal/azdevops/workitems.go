@@ -11,11 +11,12 @@ import (
 
 // WorkItem represents a single Azure DevOps work item.
 type WorkItem struct {
-	ID    int
-	Title string
-	State string
-	Type  string
-	Tags  string
+	ID         int
+	Title      string
+	State      string
+	Type       string
+	Tags       string
+	AssignedTo string
 }
 
 // WorkItemOpts controls how work items are queried.
@@ -45,15 +46,21 @@ type batchRequest struct {
 	Fields []string `json:"fields"`
 }
 
+// adoIdentity matches the object ADO returns for person fields like System.AssignedTo.
+type adoIdentity struct {
+	DisplayName string `json:"displayName"`
+	UniqueName  string `json:"uniqueName"`
+}
+
 type batchResponse struct {
 	Value []struct {
 		ID     int `json:"id"`
 		Fields struct {
-			Title      string `json:"System.Title"`
-			State      string `json:"System.State"`
-			Type       string `json:"System.WorkItemType"`
-			Tags       string `json:"System.Tags"`
-			AssignedTo string `json:"System.AssignedTo"`
+			Title      string      `json:"System.Title"`
+			State      string      `json:"System.State"`
+			Type       string      `json:"System.WorkItemType"`
+			Tags       string      `json:"System.Tags"`
+			AssignedTo adoIdentity `json:"System.AssignedTo"`
 		} `json:"fields"`
 	} `json:"value"`
 }
@@ -180,11 +187,12 @@ func fetchBatch(c *Client, ids []int) ([]WorkItem, error) {
 	items := make([]WorkItem, len(result.Value))
 	for i, v := range result.Value {
 		items[i] = WorkItem{
-			ID:    v.ID,
-			Title: v.Fields.Title,
-			State: v.Fields.State,
-			Type:  v.Fields.Type,
-			Tags:  v.Fields.Tags,
+			ID:         v.ID,
+			Title:      v.Fields.Title,
+			State:      v.Fields.State,
+			Type:       v.Fields.Type,
+			Tags:       v.Fields.Tags,
+			AssignedTo: v.Fields.AssignedTo.DisplayName,
 		}
 	}
 	return items, nil
