@@ -162,3 +162,30 @@ To save to a file:
 ```bash
 dailyup summary > update.md
 ```
+
+## Copying work items
+
+`dailyup copy` duplicates one or more work items into a different area and sprint. It copies the title, type, tags, and description, resets the state to New, and leaves the assignee blank.
+
+```bash
+# Preview what would be created (no writes)
+dailyup copy --id 1234 --id 5678 \
+  --to-area   "MyProject\Area B" \
+  --to-sprint "Team B\Iteration 2" \
+  --dry-run
+
+# Create the copies
+dailyup copy --id 1234 --id 5678 \
+  --to-area   "MyProject\Area B" \
+  --to-sprint "Team B\Iteration 2"
+```
+
+Work item IDs are visible in ADO and in the output of `dailyup summary`. Pass `--id` multiple times to copy several items in one run.
+
+| Flag | Required | Description |
+|------|----------|-------------|
+| `--id` | yes | Work item ID to copy; repeat for multiple |
+| `--to-area` | yes | Target area path, e.g. `MyProject\Area B` |
+| `--to-sprint` | yes | Target iteration path, e.g. `Team B\Iteration 2` |
+| `--dry-run` | no | Print what would be created without writing |
+| `--debug` | no | Print raw HTTP requests and responses to stderr |
