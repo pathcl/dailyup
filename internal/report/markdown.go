@@ -1,3 +1,8 @@
+// Package report renders Azure DevOps data as Markdown.
+// Render is the single entry point; it groups work items by type, formats pull
+// requests with status and repo name, and lists commits with short SHA. The
+// report title is passed as a pre-formatted string by the caller so the package
+// has no dependency on query mode or date arithmetic.
 package report
 
 import (

@@ -1,3 +1,7 @@
+// Package azdevops provides a thin client for the Azure DevOps REST API (v7.1).
+// Authentication uses the Azure CLI credential (az login); no PAT is required.
+// The package is split into focused files by resource type: workitems, pullrequests,
+// commits, and revisions — all sharing the single *Client defined here.
 package azdevops
 
 import (

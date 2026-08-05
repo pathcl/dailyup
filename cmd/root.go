@@ -1,3 +1,8 @@
+// Package cmd implements the dailyup command-line interface.
+// It exposes two subcommands: "summary" generates a Markdown work report for a
+// sprint or date window, and "types" lists the work item types available in the
+// configured Azure DevOps project. CLI flags always take precedence over values
+// read from the TOML config file.
 package cmd
 
 import (
