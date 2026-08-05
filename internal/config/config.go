@@ -1,3 +1,7 @@
+// Package config loads and validates the TOML configuration file for dailyup.
+// The default file path is ~/.config/dailyup/config.toml. Boolean fields
+// (pull_requests, commits) use opt-out semantics: an absent key means enabled,
+// and explicit false means disabled. Tilde expansion is performed on the path.
 package config
 
 import (
@@ -9,6 +13,7 @@ import (
 	"github.com/BurntSushi/toml"
 )
 
+// Config holds all settings loaded from the TOML file.
 type Config struct {
 	Organization string   `toml:"organization"`
 	Project      string   `toml:"project"`
