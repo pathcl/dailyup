@@ -95,7 +95,9 @@ type authTransport struct {
 func (t *authTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	clone := req.Clone(req.Context())
 	clone.Header.Set("Authorization", t.header)
-	clone.Header.Set("Content-Type", "application/json")
+	if clone.Header.Get("Content-Type") == "" {
+		clone.Header.Set("Content-Type", "application/json")
+	}
 	return t.wrapped.RoundTrip(clone)
 }
 

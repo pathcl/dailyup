@@ -192,6 +192,122 @@ func runWIQL(c *Client, query string) ([]int, error) {
 	return ids, nil
 }
 
+// CopyableWorkItem holds the fields needed to duplicate a work item to a new area/sprint.
+type CopyableWorkItem struct {
+	ID          int
+	Title       string
+	Type        string
+	Tags        string
+	Description string
+	AreaPath    string
+}
+
+// FetchWorkItemsByIDs fetches a richer set of fields for the given IDs, suitable for copying.
+func FetchWorkItemsByIDs(c *Client, ids []int) ([]CopyableWorkItem, error) {
+	if len(ids) == 0 {
+		return nil, nil
+	}
+	endpoint := fmt.Sprintf("%s/_apis/wit/workitemsbatch?api-version=7.1", c.OrgURL())
+	body, err := json.Marshal(batchRequest{
+		IDs: ids,
+		Fields: []string{
+			"System.Id", "System.Title", "System.WorkItemType",
+			"System.Tags", "System.Description", "System.AreaPath",
+		},
+	})
+	if err != nil {
+		return nil, err
+	}
+	resp, err := c.HTTP().Post(endpoint, "application/json", bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		b, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("workitemsbatch HTTP %d: %s", resp.StatusCode, b)
+	}
+	var raw struct {
+		Value []struct {
+			ID     int `json:"id"`
+			Fields struct {
+				Title       string `json:"System.Title"`
+				Type        string `json:"System.WorkItemType"`
+				Tags        string `json:"System.Tags"`
+				Description string `json:"System.Description"`
+				AreaPath    string `json:"System.AreaPath"`
+			} `json:"fields"`
+		} `json:"value"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&raw); err != nil {
+		return nil, err
+	}
+	items := make([]CopyableWorkItem, len(raw.Value))
+	for i, v := range raw.Value {
+		items[i] = CopyableWorkItem{
+			ID:          v.ID,
+			Title:       v.Fields.Title,
+			Type:        v.Fields.Type,
+			Tags:        v.Fields.Tags,
+			Description: v.Fields.Description,
+			AreaPath:    v.Fields.AreaPath,
+		}
+	}
+	return items, nil
+}
+
+type patchOp struct {
+	Op    string `json:"op"`
+	Path  string `json:"path"`
+	Value string `json:"value"`
+}
+
+// CreateWorkItem creates a new work item of the same type as src, overriding area and iteration.
+// Returns the ID of the newly created work item.
+func CreateWorkItem(c *Client, src CopyableWorkItem, toArea, toIteration string) (int, error) {
+	ops := []patchOp{
+		{Op: "add", Path: "/fields/System.Title", Value: src.Title},
+		{Op: "add", Path: "/fields/System.AreaPath", Value: toArea},
+		{Op: "add", Path: "/fields/System.IterationPath", Value: toIteration},
+	}
+	if src.Tags != "" {
+		ops = append(ops, patchOp{Op: "add", Path: "/fields/System.Tags", Value: src.Tags})
+	}
+	if src.Description != "" {
+		ops = append(ops, patchOp{Op: "add", Path: "/fields/System.Description", Value: src.Description})
+	}
+
+	body, err := json.Marshal(ops)
+	if err != nil {
+		return 0, err
+	}
+
+	endpoint := fmt.Sprintf("%s/_apis/wit/workitems/$%s?api-version=7.1",
+		c.ProjectURL(), src.Type)
+	req, err := http.NewRequest(http.MethodPatch, endpoint, bytes.NewReader(body))
+	if err != nil {
+		return 0, err
+	}
+	req.Header.Set("Content-Type", "application/json-patch+json")
+
+	resp, err := c.HTTP().Do(req)
+	if err != nil {
+		return 0, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
+		b, _ := io.ReadAll(resp.Body)
+		return 0, fmt.Errorf("create work item HTTP %d: %s", resp.StatusCode, b)
+	}
+	var result struct {
+		ID int `json:"id"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return 0, err
+	}
+	return result.ID, nil
+}
+
 func fetchBatch(c *Client, ids []int) ([]WorkItem, error) {
 	url := fmt.Sprintf("%s/_apis/wit/workitemsbatch?api-version=7.1", c.OrgURL())
 	body, err := json.Marshal(batchRequest{
