@@ -11,6 +11,7 @@ import (
 var (
 	copyIDs    []int
 	copyParent int
+	copyTags   string
 	toArea     string
 	toSprint   string
 	copyDryRun bool
@@ -29,6 +30,7 @@ func init() {
 	copyCmd.Flags().StringVar(&toArea, "to-area", "", "target area path, e.g. \"MyProject\\Area B\"")
 	copyCmd.Flags().StringVar(&toSprint, "to-sprint", "", "target iteration path, e.g. \"Team B\\Iteration 2\"")
 	copyCmd.Flags().IntVar(&copyParent, "parent", 0, "parent work item ID to link copied items under")
+	copyCmd.Flags().StringVar(&copyTags, "tags", "", "comma-separated tags to apply, overriding the source item's tags")
 	copyCmd.Flags().BoolVar(&copyDryRun, "dry-run", false, "print what would be created without writing")
 	copyCmd.Flags().BoolVar(&copyDebug, "debug", false, "print raw HTTP requests and responses to stderr")
 	copyCmd.Flags().StringVar(&copyCfg, "config", config.DefaultPath(), "path to config file")
@@ -57,6 +59,9 @@ func runCopy(cmd *cobra.Command, args []string) error {
 	}
 
 	for _, item := range items {
+		if copyTags != "" {
+			item.Tags = copyTags
+		}
 		if copyDryRun {
 			fmt.Printf("[dry-run] Would copy #%d %q (%s) → %s / %s\n",
 				item.ID, item.Title, item.Type, toArea, toSprint)

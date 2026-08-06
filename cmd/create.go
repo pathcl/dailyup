@@ -14,6 +14,7 @@ var (
 	createParent int
 	createArea   string
 	createSprint string
+	createTags   string
 	createTask   bool
 	createDebug  bool
 	createCfg    string
@@ -29,6 +30,7 @@ func init() {
 	createCmd.Flags().IntVar(&createParent, "parent", 0, "parent work item ID")
 	createCmd.Flags().StringVar(&createArea, "area", "", "area path (overrides config default)")
 	createCmd.Flags().StringVar(&createSprint, "sprint", "", "iteration path (overrides config default)")
+	createCmd.Flags().StringVar(&createTags, "tags", "", "comma-separated tags to apply, e.g. \"backend,api\"")
 	createCmd.Flags().BoolVar(&createTask, "task", false, "create a Task instead of a User Story")
 	createCmd.Flags().BoolVar(&createDebug, "debug", false, "print raw HTTP requests and responses to stderr")
 	createCmd.Flags().StringVar(&createCfg, "config", config.DefaultPath(), "path to config file")
@@ -88,7 +90,7 @@ func runCreate(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("auth: %w", err)
 	}
 
-	newID, err := azdevops.CreateNewWorkItem(client, itemType, title, description, area, sprint, createParent)
+	newID, err := azdevops.CreateNewWorkItem(client, itemType, title, description, createTags, area, sprint, createParent)
 	if err != nil {
 		return fmt.Errorf("create: %w", err)
 	}
