@@ -90,6 +90,8 @@ email        = "you@example.com"  # Your email address, used to filter commits b
 | `email`         | no       | —       | Your email, used as the commit author filter |
 | `pull_requests` | no       | `true`  | Set to `false` to skip fetching pull requests |
 | `commits`       | no       | `true`  | Set to `false` to skip fetching commits |
+| `area`          | no       | —       | Default area path for `dailyup create` |
+| `sprint`        | no       | —       | Default iteration path for `dailyup create` |
 
 ## Usage
 
@@ -188,4 +190,43 @@ Work item IDs are visible in ADO and in the output of `dailyup summary`. Pass `-
 | `--to-area` | yes | Target area path, e.g. `MyProject\Area B` |
 | `--to-sprint` | yes | Target iteration path, e.g. `Team B\Iteration 2` |
 | `--dry-run` | no | Print what would be created without writing |
+| `--debug` | no | Print raw HTTP requests and responses to stderr |
+
+## Creating work items
+
+`dailyup create` opens your editor (`$VISUAL`, `$EDITOR`, or `vi`) with a template, then creates the work item in ADO when you save and close. Creates a User Story by default; pass `--task` for a Task.
+
+Area and sprint default to the `area` and `sprint` values in your config file and can be overridden with flags.
+
+```bash
+# Create a User Story (uses area/sprint from config)
+dailyup create --parent 1234
+
+# Create a Task
+dailyup create --parent 1234 --task
+
+# Override area and sprint for this run
+dailyup create --parent 1234 \
+  --area   "MyProject\Area B" \
+  --sprint "Team B\Iteration 2"
+```
+
+The editor opens with this template:
+
+```
+Title:
+
+Description:
+
+# Lines starting with '#' are ignored.
+```
+
+Fill in the `Title:` line (required) and optionally add a description below `Description:`. Save and close the editor to create the item; quit without saving (or leave the title blank) to abort.
+
+| Flag | Required | Description |
+|------|----------|-------------|
+| `--parent` | yes | Parent work item ID |
+| `--task` | no | Create a Task instead of a User Story |
+| `--area` | no | Area path — overrides config `area` |
+| `--sprint` | no | Iteration path — overrides config `sprint` |
 | `--debug` | no | Print raw HTTP requests and responses to stderr |
