@@ -86,7 +86,7 @@ func TestCreateWorkItem_SendsCorrectPatch(t *testing.T) {
 		AreaPath:    "MyProject\\Area A",
 	}
 	// Pass unqualified paths; the client project is "proj" so they get prefixed.
-	newID, err := azdevops.CreateWorkItem(c, src, "Area B", "Iteration 2")
+	newID, err := azdevops.CreateWorkItem(c, src, "Area B", "Iteration 2", 0)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -131,7 +131,7 @@ func TestCreateWorkItem_OmitsEmptyTagsAndDescription(t *testing.T) {
 	c := newClient(t, srv)
 
 	src := azdevops.CopyableWorkItem{Title: "T", Type: "Task"} // no Tags, no Description
-	azdevops.CreateWorkItem(c, src, "A", "B")
+	azdevops.CreateWorkItem(c, src, "A", "B", 0)
 
 	for _, op := range capturedBody {
 		if op["path"] == "/fields/System.Tags" {
