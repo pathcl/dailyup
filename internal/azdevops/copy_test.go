@@ -85,7 +85,8 @@ func TestCreateWorkItem_SendsCorrectPatch(t *testing.T) {
 		Description: "<p>details</p>",
 		AreaPath:    "MyProject\\Area A",
 	}
-	newID, err := azdevops.CreateWorkItem(c, src, "MyProject\\Area B", "Team B\\Iteration 2")
+	// Pass unqualified paths; the client project is "proj" so they get prefixed.
+	newID, err := azdevops.CreateWorkItem(c, src, "Area B", "Iteration 2")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -107,11 +108,11 @@ func TestCreateWorkItem_SendsCorrectPatch(t *testing.T) {
 	if v := findOp("System.Title"); v != "My Story" {
 		t.Errorf("Title op: want %q, got %q", "My Story", v)
 	}
-	if v := findOp("System.AreaPath"); v != "MyProject\\Area B" {
-		t.Errorf("AreaPath op: want %q, got %q", "MyProject\\Area B", v)
+	if v := findOp("System.AreaPath"); v != `proj\Area B` {
+		t.Errorf("AreaPath op: want %q, got %q", `proj\Area B`, v)
 	}
-	if v := findOp("System.IterationPath"); v != "Team B\\Iteration 2" {
-		t.Errorf("IterationPath op: want %q, got %q", "Team B\\Iteration 2", v)
+	if v := findOp("System.IterationPath"); v != `proj\Iteration 2` {
+		t.Errorf("IterationPath op: want %q, got %q", `proj\Iteration 2`, v)
 	}
 	if v := findOp("System.Tags"); v != "backend" {
 		t.Errorf("Tags op: want %q, got %q", "backend", v)

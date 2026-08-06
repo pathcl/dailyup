@@ -7,7 +7,18 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strings"
 )
+
+// qualifyPath ensures path starts with "project\", as required by ADO for
+// System.AreaPath and System.IterationPath field values.
+func qualifyPath(project, path string) string {
+	prefix := project + `\`
+	if strings.HasPrefix(path, prefix) {
+		return path
+	}
+	return prefix + path
+}
 
 type createPatchOp struct {
 	Op    string      `json:"op"`
@@ -26,8 +37,8 @@ type relationValue struct {
 func CreateNewWorkItem(c *Client, itemType, title, description, areaPath, iterationPath string, parentID int) (int, error) {
 	ops := []createPatchOp{
 		{Op: "add", Path: "/fields/System.Title", Value: title},
-		{Op: "add", Path: "/fields/System.AreaPath", Value: areaPath},
-		{Op: "add", Path: "/fields/System.IterationPath", Value: iterationPath},
+		{Op: "add", Path: "/fields/System.AreaPath", Value: qualifyPath(c.Project(), areaPath)},
+		{Op: "add", Path: "/fields/System.IterationPath", Value: qualifyPath(c.Project(), iterationPath)},
 	}
 	if description != "" {
 		ops = append(ops, createPatchOp{Op: "add", Path: "/fields/System.Description", Value: description})
