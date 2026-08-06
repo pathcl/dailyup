@@ -10,6 +10,7 @@ import (
 
 var (
 	copyIDs    []int
+	copyParent int
 	toArea     string
 	toSprint   string
 	copyDryRun bool
@@ -27,6 +28,7 @@ func init() {
 	copyCmd.Flags().IntSliceVar(&copyIDs, "id", nil, "work item ID(s) to copy (repeatable)")
 	copyCmd.Flags().StringVar(&toArea, "to-area", "", "target area path, e.g. \"MyProject\\Area B\"")
 	copyCmd.Flags().StringVar(&toSprint, "to-sprint", "", "target iteration path, e.g. \"Team B\\Iteration 2\"")
+	copyCmd.Flags().IntVar(&copyParent, "parent", 0, "parent work item ID to link copied items under")
 	copyCmd.Flags().BoolVar(&copyDryRun, "dry-run", false, "print what would be created without writing")
 	copyCmd.Flags().BoolVar(&copyDebug, "debug", false, "print raw HTTP requests and responses to stderr")
 	copyCmd.Flags().StringVar(&copyCfg, "config", config.DefaultPath(), "path to config file")
@@ -60,7 +62,7 @@ func runCopy(cmd *cobra.Command, args []string) error {
 				item.ID, item.Title, item.Type, toArea, toSprint)
 			continue
 		}
-		newID, err := azdevops.CreateWorkItem(client, item, toArea, toSprint)
+		newID, err := azdevops.CreateWorkItem(client, item, toArea, toSprint, copyParent)
 		if err != nil {
 			return fmt.Errorf("copy #%d: %w", item.ID, err)
 		}

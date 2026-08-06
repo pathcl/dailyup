@@ -257,14 +257,15 @@ func FetchWorkItemsByIDs(c *Client, ids []int) ([]CopyableWorkItem, error) {
 }
 
 type patchOp struct {
-	Op    string `json:"op"`
-	Path  string `json:"path"`
-	Value string `json:"value"`
+	Op    string      `json:"op"`
+	Path  string      `json:"path"`
+	Value interface{} `json:"value"`
 }
 
 // CreateWorkItem creates a new work item of the same type as src, overriding area and iteration.
+// If parentID > 0, the new item is linked as a child of that work item.
 // Returns the ID of the newly created work item.
-func CreateWorkItem(c *Client, src CopyableWorkItem, toArea, toIteration string) (int, error) {
+func CreateWorkItem(c *Client, src CopyableWorkItem, toArea, toIteration string, parentID int) (int, error) {
 	ops := []patchOp{
 		{Op: "add", Path: "/fields/System.Title", Value: src.Title},
 		{Op: "add", Path: "/fields/System.AreaPath", Value: qualifyPath(c.Project(), toArea)},
@@ -275,6 +276,17 @@ func CreateWorkItem(c *Client, src CopyableWorkItem, toArea, toIteration string)
 	}
 	if src.Description != "" {
 		ops = append(ops, patchOp{Op: "add", Path: "/fields/System.Description", Value: src.Description})
+	}
+	if parentID > 0 {
+		ops = append(ops, patchOp{
+			Op:   "add",
+			Path: "/relations/-",
+			Value: relationValue{
+				Rel:        "System.LinkTypes.Hierarchy-Reverse",
+				URL:        fmt.Sprintf("%s/_apis/wit/workItems/%d", c.OrgURL(), parentID),
+				Attributes: map[string]string{"comment": ""},
+			},
+		})
 	}
 
 	body, err := json.Marshal(ops)
