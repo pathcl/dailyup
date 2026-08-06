@@ -22,8 +22,9 @@ func TestCreateNewWorkItem_SendsCorrectPatch(t *testing.T) {
 	defer srv.Close()
 	c := newClient(t, srv)
 
+	// Pass unqualified paths; the client project is "proj" so they get prefixed.
 	newID, err := azdevops.CreateNewWorkItem(c, "User Story", "My Story", "Some details",
-		"MyProject\\Area B", "Team B\\Iteration 2", 100)
+		"Area B", "Iteration 2", 100)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -45,11 +46,11 @@ func TestCreateNewWorkItem_SendsCorrectPatch(t *testing.T) {
 	if v, _ := findField("System.Title").(string); v != "My Story" {
 		t.Errorf("Title: want %q, got %q", "My Story", v)
 	}
-	if v, _ := findField("System.AreaPath").(string); v != "MyProject\\Area B" {
-		t.Errorf("AreaPath: want %q, got %q", "MyProject\\Area B", v)
+	if v, _ := findField("System.AreaPath").(string); v != `proj\Area B` {
+		t.Errorf("AreaPath: want %q, got %q", `proj\Area B`, v)
 	}
-	if v, _ := findField("System.IterationPath").(string); v != "Team B\\Iteration 2" {
-		t.Errorf("IterationPath: want %q, got %q", "Team B\\Iteration 2", v)
+	if v, _ := findField("System.IterationPath").(string); v != `proj\Iteration 2` {
+		t.Errorf("IterationPath: want %q, got %q", `proj\Iteration 2`, v)
 	}
 	if v, _ := findField("System.Description").(string); v != "Some details" {
 		t.Errorf("Description: want %q, got %q", "Some details", v)
@@ -72,6 +73,67 @@ func TestCreateNewWorkItem_SendsCorrectPatch(t *testing.T) {
 	}
 	if parentURL, _ := val["url"].(string); !strings.Contains(parentURL, "100") {
 		t.Errorf("parent URL should contain parent ID 100, got %q", parentURL)
+	}
+}
+
+func TestCreateNewWorkItem_QualifiesAreaAndIterationPaths(t *testing.T) {
+	var capturedBody []map[string]interface{}
+
+	srv := newMockServer(func(w http.ResponseWriter, r *http.Request) {
+		json.NewDecoder(r.Body).Decode(&capturedBody)
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{"id": 1})
+	})
+	defer srv.Close()
+	c := newClient(t, srv) // project = "proj"
+
+	// Pass paths without the project prefix — they should be qualified automatically.
+	azdevops.CreateNewWorkItem(c, "User Story", "T", "", "Area B", "Sprint 1", 0)
+
+	findField := func(field string) string {
+		for _, op := range capturedBody {
+			if op["path"] == "/fields/"+field {
+				v, _ := op["value"].(string)
+				return v
+			}
+		}
+		return ""
+	}
+	if v := findField("System.AreaPath"); v != `proj\Area B` {
+		t.Errorf("AreaPath: want %q, got %q", `proj\Area B`, v)
+	}
+	if v := findField("System.IterationPath"); v != `proj\Sprint 1` {
+		t.Errorf("IterationPath: want %q, got %q", `proj\Sprint 1`, v)
+	}
+}
+
+func TestCreateNewWorkItem_AlreadyQualifiedPathUnchanged(t *testing.T) {
+	var capturedBody []map[string]interface{}
+
+	srv := newMockServer(func(w http.ResponseWriter, r *http.Request) {
+		json.NewDecoder(r.Body).Decode(&capturedBody)
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{"id": 1})
+	})
+	defer srv.Close()
+	c := newClient(t, srv) // project = "proj"
+
+	azdevops.CreateNewWorkItem(c, "User Story", "T", "", `proj\Area B`, `proj\Sprint 1`, 0)
+
+	findField := func(field string) string {
+		for _, op := range capturedBody {
+			if op["path"] == "/fields/"+field {
+				v, _ := op["value"].(string)
+				return v
+			}
+		}
+		return ""
+	}
+	if v := findField("System.AreaPath"); v != `proj\Area B` {
+		t.Errorf("AreaPath: want %q, got %q", `proj\Area B`, v)
+	}
+	if v := findField("System.IterationPath"); v != `proj\Sprint 1` {
+		t.Errorf("IterationPath: want %q, got %q", `proj\Sprint 1`, v)
 	}
 }
 

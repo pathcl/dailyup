@@ -267,8 +267,8 @@ type patchOp struct {
 func CreateWorkItem(c *Client, src CopyableWorkItem, toArea, toIteration string) (int, error) {
 	ops := []patchOp{
 		{Op: "add", Path: "/fields/System.Title", Value: src.Title},
-		{Op: "add", Path: "/fields/System.AreaPath", Value: toArea},
-		{Op: "add", Path: "/fields/System.IterationPath", Value: toIteration},
+		{Op: "add", Path: "/fields/System.AreaPath", Value: qualifyPath(c.Project(), toArea)},
+		{Op: "add", Path: "/fields/System.IterationPath", Value: qualifyPath(c.Project(), toIteration)},
 	}
 	if src.Tags != "" {
 		ops = append(ops, patchOp{Op: "add", Path: "/fields/System.Tags", Value: src.Tags})
