@@ -23,6 +23,8 @@ type Config struct {
 	Email        string   `toml:"email"`         // used for commit author filtering
 	PullRequests bool     `toml:"pull_requests"` // fetch pull requests (default: true)
 	Commits      bool     `toml:"commits"`       // fetch commits (default: true)
+	Area         string   `toml:"area"`          // default area path for create command
+	Sprint       string   `toml:"sprint"`        // default sprint for create command
 }
 
 // DefaultPath returns ~/.config/dailyup/config.toml.
