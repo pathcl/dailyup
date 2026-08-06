@@ -34,7 +34,7 @@ type relationValue struct {
 
 // CreateNewWorkItem creates a work item of itemType under the given parent,
 // area, and iteration. Returns the ID of the newly created item.
-func CreateNewWorkItem(c *Client, itemType, title, description, areaPath, iterationPath string, parentID int) (int, error) {
+func CreateNewWorkItem(c *Client, itemType, title, description, tags, areaPath, iterationPath string, parentID int) (int, error) {
 	ops := []createPatchOp{
 		{Op: "add", Path: "/fields/System.Title", Value: title},
 		{Op: "add", Path: "/fields/System.AreaPath", Value: qualifyPath(c.Project(), areaPath)},
@@ -42,6 +42,9 @@ func CreateNewWorkItem(c *Client, itemType, title, description, areaPath, iterat
 	}
 	if description != "" {
 		ops = append(ops, createPatchOp{Op: "add", Path: "/fields/System.Description", Value: description})
+	}
+	if tags != "" {
+		ops = append(ops, createPatchOp{Op: "add", Path: "/fields/System.Tags", Value: tags})
 	}
 	if parentID > 0 {
 		parentURL := fmt.Sprintf("%s/_apis/wit/workItems/%d", c.OrgURL(), parentID)

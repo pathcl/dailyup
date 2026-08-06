@@ -24,7 +24,7 @@ func TestCreateNewWorkItem_SendsCorrectPatch(t *testing.T) {
 
 	// Pass unqualified paths; the client project is "proj" so they get prefixed.
 	newID, err := azdevops.CreateNewWorkItem(c, "User Story", "My Story", "Some details",
-		"Area B", "Iteration 2", 100)
+		"backend", "Area B", "Iteration 2", 100)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -88,7 +88,7 @@ func TestCreateNewWorkItem_QualifiesAreaAndIterationPaths(t *testing.T) {
 	c := newClient(t, srv) // project = "proj"
 
 	// Pass paths without the project prefix — they should be qualified automatically.
-	azdevops.CreateNewWorkItem(c, "User Story", "T", "", "Area B", "Sprint 1", 0)
+	azdevops.CreateNewWorkItem(c, "User Story", "T", "", "", "Area B", "Sprint 1", 0)
 
 	findField := func(field string) string {
 		for _, op := range capturedBody {
@@ -118,7 +118,7 @@ func TestCreateNewWorkItem_AlreadyQualifiedPathUnchanged(t *testing.T) {
 	defer srv.Close()
 	c := newClient(t, srv) // project = "proj"
 
-	azdevops.CreateNewWorkItem(c, "User Story", "T", "", `proj\Area B`, `proj\Sprint 1`, 0)
+	azdevops.CreateNewWorkItem(c, "User Story", "T", "", "", `proj\Area B`, `proj\Sprint 1`, 0)
 
 	findField := func(field string) string {
 		for _, op := range capturedBody {
@@ -148,7 +148,7 @@ func TestCreateNewWorkItem_NoDescriptionOmitted(t *testing.T) {
 	defer srv.Close()
 	c := newClient(t, srv)
 
-	azdevops.CreateNewWorkItem(c, "Task", "T", "", "A", "B", 0)
+	azdevops.CreateNewWorkItem(c, "Task", "T", "", "", "A", "B", 0)
 
 	for _, op := range capturedBody {
 		if op["path"] == "/fields/System.Description" {
