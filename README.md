@@ -194,7 +194,7 @@ Work item IDs are visible in ADO and in the output of `dailyup summary`. Pass `-
 
 ## Creating work items
 
-`dailyup create` opens your editor (`$VISUAL`, `$EDITOR`, or `vi`) with a template, then creates the work item in ADO when you save and close. Creates a User Story by default; pass `--task` for a Task.
+`dailyup create` opens your editor (`$VISUAL`, `$EDITOR`, or `vi`) with a template, then creates the work item in ADO when you save and close. Creates a User Story by default; pass `--type` to select the item type.
 
 Area and sprint default to the `area` and `sprint` values in your config file and can be overridden with flags.
 
@@ -202,31 +202,52 @@ Area and sprint default to the `area` and `sprint` values in your config file an
 # Create a User Story (uses area/sprint from config)
 dailyup create --parent 1234
 
+# Create a Feature
+dailyup create --parent 1234 --type feature
+
 # Create a Task
+dailyup create --parent 1234 --type task
+# or use the shorthand
 dailyup create --parent 1234 --task
 
 # Override area and sprint for this run
-dailyup create --parent 1234 \
+dailyup create --parent 1234 --type feature \
   --area   "MyProject\Area B" \
   --sprint "Team B\Iteration 2"
+
+# Use a one-off custom template file
+dailyup create --parent 1234 --template ~/my-template.md
 ```
 
-The editor opens with this template:
+Each type opens with a structured template in your editor. Fill in the `Title:` line (required) and the `Description:` section below it. Save and close to create the item; quit without saving (or leave the title blank) to abort. Lines starting with `#` are treated as comments and ignored.
 
+### Customising templates
+
+Templates are loaded in this order:
+
+1. `--template <path>` — one-off override for this run
+2. `~/.config/dailyup/templates/<type>.md` — your persistent per-type template
+3. Built-in default
+
+To customise a template permanently:
+
+```bash
+mkdir -p ~/.config/dailyup/templates
+# copy the built-in default and edit it
+$EDITOR ~/.config/dailyup/templates/story.md
+$EDITOR ~/.config/dailyup/templates/task.md
+$EDITOR ~/.config/dailyup/templates/feature.md
 ```
-Title:
 
-Description:
-
-# Lines starting with '#' are ignored.
-```
-
-Fill in the `Title:` line (required) and optionally add a description below `Description:`. Save and close the editor to create the item; quit without saving (or leave the title blank) to abort.
+Changes take effect immediately — no rebuild needed.
 
 | Flag | Required | Description |
 |------|----------|-------------|
 | `--parent` | yes | Parent work item ID |
-| `--task` | no | Create a Task instead of a User Story |
+| `--type` | no | Item type: `story` (default), `task`, or `feature` |
+| `--task` | no | Shorthand for `--type task` |
+| `--template` | no | Path to a custom editor template file |
 | `--area` | no | Area path — overrides config `area` |
 | `--sprint` | no | Iteration path — overrides config `sprint` |
+| `--tags` | no | Comma-separated tags, e.g. `"backend,infra"` |
 | `--debug` | no | Print raw HTTP requests and responses to stderr |
