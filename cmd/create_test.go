@@ -1,10 +1,105 @@
 package cmd_test
 
 import (
+	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/pathcl/dailyup/cmd"
 )
+
+func TestItemTypeFromFlag(t *testing.T) {
+	cases := []struct {
+		typeFlag string
+		taskFlag bool
+		want     string
+		wantErr  bool
+	}{
+		{"story", false, "User Story", false},
+		{"", false, "User Story", false},
+		{"task", false, "Task", false},
+		{"feature", false, "Feature", false},
+		{"FEATURE", false, "Feature", false},
+		{"", true, "Task", false},
+		{"feature", true, "Feature", false}, // --type wins over --task
+		{"epic", false, "", true},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.typeFlag+"/task="+func() string {
+			if tc.taskFlag {
+				return "true"
+			}
+			return "false"
+		}(), func(t *testing.T) {
+			got, err := cmd.ItemTypeFromFlag(tc.typeFlag, tc.taskFlag)
+			if tc.wantErr {
+				if err == nil {
+					t.Error("expected error, got nil")
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if got != tc.want {
+				t.Errorf("got %q, want %q", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestLoadTemplate_FallsBackToDefault(t *testing.T) {
+	got := cmd.LoadTemplate("story", "", t.TempDir())
+	if !strings.Contains(got, "Title:") {
+		t.Error("default story template should contain 'Title:'")
+	}
+	if !strings.Contains(got, "Description:") {
+		t.Error("default story template should contain 'Description:'")
+	}
+}
+
+func TestLoadTemplate_ReadsCustomPath(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "custom.md")
+	content := "Title:\n\nDescription:\ncustom template\n"
+	if err := os.WriteFile(path, []byte(content), 0600); err != nil {
+		t.Fatal(err)
+	}
+	got := cmd.LoadTemplate("story", path, t.TempDir())
+	if got != content {
+		t.Errorf("got %q, want %q", got, content)
+	}
+}
+
+func TestLoadTemplate_ReadsFromTemplatesDir(t *testing.T) {
+	dir := t.TempDir()
+	content := "Title:\n\nDescription:\nfrom templates dir\n"
+	if err := os.WriteFile(filepath.Join(dir, "feature.md"), []byte(content), 0600); err != nil {
+		t.Fatal(err)
+	}
+	got := cmd.LoadTemplate("feature", "", dir)
+	if got != content {
+		t.Errorf("got %q, want %q", got, content)
+	}
+}
+
+func TestLoadTemplate_CustomPathTakesPrecedenceOverDir(t *testing.T) {
+	dir := t.TempDir()
+	dirContent := "Title:\n\nDescription:\nfrom dir\n"
+	os.WriteFile(filepath.Join(dir, "story.md"), []byte(dirContent), 0600)
+
+	customDir := t.TempDir()
+	customContent := "Title:\n\nDescription:\ncustom\n"
+	customPath := filepath.Join(customDir, "custom.md")
+	os.WriteFile(customPath, []byte(customContent), 0600)
+
+	got := cmd.LoadTemplate("story", customPath, dir)
+	if got != customContent {
+		t.Errorf("custom path should win; got %q, want %q", got, customContent)
+	}
+}
 
 func TestParseCreateContent(t *testing.T) {
 	cases := []struct {

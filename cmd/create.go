@@ -2,6 +2,8 @@ package cmd
 
 import (
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/pathcl/dailyup/internal/azdevops"
@@ -11,13 +13,15 @@ import (
 )
 
 var (
-	createParent int
-	createArea   string
-	createSprint string
-	createTags   string
-	createTask   bool
-	createDebug  bool
-	createCfg    string
+	createParent   int
+	createArea     string
+	createSprint   string
+	createTags     string
+	createTask     bool
+	createType     string
+	createTemplate string
+	createDebug    bool
+	createCfg      string
 )
 
 var createCmd = &cobra.Command{
@@ -31,21 +35,143 @@ func init() {
 	createCmd.Flags().StringVar(&createArea, "area", "", "area path (overrides config default)")
 	createCmd.Flags().StringVar(&createSprint, "sprint", "", "iteration path (overrides config default)")
 	createCmd.Flags().StringVar(&createTags, "tags", "", "comma-separated tags to apply, e.g. \"backend,api\"")
-	createCmd.Flags().BoolVar(&createTask, "task", false, "create a Task instead of a User Story")
+	createCmd.Flags().BoolVar(&createTask, "task", false, "create a Task (shorthand for --type task)")
+	createCmd.Flags().StringVar(&createType, "type", "", "work item type: story (default), task, or feature")
+	createCmd.Flags().StringVar(&createTemplate, "template", "", "path to a custom editor template file")
 	createCmd.Flags().BoolVar(&createDebug, "debug", false, "print raw HTTP requests and responses to stderr")
 	createCmd.Flags().StringVar(&createCfg, "config", config.DefaultPath(), "path to config file")
 	_ = createCmd.MarkFlagRequired("parent")
 	rootCmd.AddCommand(createCmd)
 }
 
-const createTemplate = `Title:
+// defaultTemplates holds the hardcoded editor template for each ADO item type.
+var defaultTemplates = map[string]string{
+	"User Story": `Title:
 
 Description:
+## Story
+As a [platform engineer / on-call / service team],
+I want [capability],
+so that [outcome].
 
-# Enter the title on the 'Title:' line (required).
-# Add an optional description below 'Description:'.
+## Context
+Why this sprint, why this priority.
+
+## Acceptance Criteria
+- [ ] Given [state], when [trigger], then [observable result]
+- [ ] Alert fires within [X]s of the condition
+- [ ] No false positives in staging for [N] hours
+- [ ] Runbook covers this scenario
+
+## Technical Approach
+[Key decisions, constraints, ADRs referenced]
+
+## Definition of Done
+- [ ] Code reviewed & merged
+- [ ] Tests pass
+- [ ] Deployed to prod
+- [ ] Error budget unaffected (verify dashboard)
+- [ ] On-call notified if behavior changes
+
 # Lines starting with '#' are ignored.
-`
+`,
+	"Task": `Title:
+
+Description:
+## What
+Single paragraph. What is being done and why.
+
+## Steps
+1. [Step]
+2. [Step]
+
+## Done When
+- [ ] [Verifiable condition]
+- [ ] PR merged / runbook updated / config deployed
+
+## Notes
+[Links, gotchas — delete if empty]
+
+# Lines starting with '#' are ignored.
+`,
+	"Feature": `Title:
+
+Description:
+## Objective
+One paragraph: what this delivers and why it matters now.
+
+## Success Metrics
+- Availability target: [e.g. 99.9%]
+- Error budget allocated: [X minutes/month]
+- Latency target: [p99 < Xms]
+- Leading indicator to watch: [metric name]
+
+## Scope
+**In:** [what's explicitly included]
+**Out:** [what's explicitly excluded]
+
+## Dependencies
+- [ ] [Team / service] — [what we need]
+
+## Risks
+| Risk | Likelihood | Mitigation |
+|------|-----------|------------|
+| [risk] | High/Med/Low | [action] |
+
+## Definition of Done
+- [ ] Runbook written and linked
+- [ ] Dashboards updated
+- [ ] Alerts tuned (signal:noise acceptable)
+- [ ] Post-rollout review scheduled
+
+# Lines starting with '#' are ignored.
+`,
+}
+
+// ItemTypeFromFlag maps --type and --task flag values to the ADO work item type
+// string. --type takes precedence over --task when both are set.
+func ItemTypeFromFlag(typeFlag string, taskFlag bool) (string, error) {
+	if typeFlag != "" {
+		switch strings.ToLower(typeFlag) {
+		case "story":
+			return "User Story", nil
+		case "task":
+			return "Task", nil
+		case "feature":
+			return "Feature", nil
+		default:
+			return "", fmt.Errorf("unknown type %q: use story, task, or feature", typeFlag)
+		}
+	}
+	if taskFlag {
+		return "Task", nil
+	}
+	return "User Story", nil
+}
+
+// LoadTemplate returns the editor template content for the given item type.
+// Lookup order: customPath → templatesDir/<type>.md → hardcoded default.
+// typeFlag is the flag value (story/task/feature); templatesDir is the
+// directory to search (pass config.TemplatesDir() in production).
+func LoadTemplate(typeFlag, customPath, templatesDir string) string {
+	if customPath != "" {
+		if b, err := os.ReadFile(customPath); err == nil {
+			return string(b)
+		}
+	}
+	if templatesDir != "" {
+		path := filepath.Join(templatesDir, strings.ToLower(typeFlag)+".md")
+		if b, err := os.ReadFile(path); err == nil {
+			return string(b)
+		}
+	}
+	// Map flag value to ADO type to look up default.
+	adoType, _ := ItemTypeFromFlag(typeFlag, false)
+	if t, ok := defaultTemplates[adoType]; ok {
+		return t
+	}
+	return defaultTemplates["User Story"]
+}
 
 func runCreate(cmd *cobra.Command, args []string) error {
 	setupLogger(createDebug)
@@ -70,12 +196,22 @@ func runCreate(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("sprint required: set 'sprint' in config or pass --sprint")
 	}
 
-	itemType := "User Story"
-	if createTask {
-		itemType = "Task"
+	itemType, err := ItemTypeFromFlag(createType, createTask)
+	if err != nil {
+		return err
 	}
 
-	content, err := editor.Open(createTemplate)
+	typeFlag := strings.ToLower(createType)
+	if typeFlag == "" {
+		if createTask {
+			typeFlag = "task"
+		} else {
+			typeFlag = "story"
+		}
+	}
+	tmpl := LoadTemplate(typeFlag, createTemplate, config.TemplatesDir())
+
+	content, err := editor.Open(tmpl)
 	if err != nil {
 		return fmt.Errorf("editor: %w", err)
 	}
@@ -106,6 +242,9 @@ func ParseCreateContent(content string) (title, description string, err error) {
 	inDesc := false
 
 	for _, line := range lines {
+		if strings.HasPrefix(line, "#") {
+			continue
+		}
 		if strings.HasPrefix(line, "Title:") {
 			title = strings.TrimSpace(strings.TrimPrefix(line, "Title:"))
 			continue

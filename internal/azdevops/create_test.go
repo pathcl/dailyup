@@ -137,6 +137,26 @@ func TestCreateNewWorkItem_AlreadyQualifiedPathUnchanged(t *testing.T) {
 	}
 }
 
+func TestCreateNewWorkItem_FeatureTypeEncodedInURL(t *testing.T) {
+	var capturedPath string
+
+	srv := newMockServer(func(w http.ResponseWriter, r *http.Request) {
+		capturedPath = r.URL.Path
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{"id": 10})
+	})
+	defer srv.Close()
+	c := newClient(t, srv)
+
+	_, err := azdevops.CreateNewWorkItem(c, "Feature", "My Feature", "", "", "Area", "Sprint", 0)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !strings.Contains(capturedPath, "$Feature") {
+		t.Errorf("URL path should contain $Feature, got %q", capturedPath)
+	}
+}
+
 func TestCreateNewWorkItem_NoDescriptionOmitted(t *testing.T) {
 	var capturedBody []map[string]interface{}
 

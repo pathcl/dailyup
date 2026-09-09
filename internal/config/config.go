@@ -33,6 +33,13 @@ func DefaultPath() string {
 	return filepath.Join(home, ".config", "dailyup", "config.toml")
 }
 
+// TemplatesDir returns ~/.config/dailyup/templates/, where per-type template
+// files (story.md, task.md, feature.md) can be placed to override defaults.
+func TemplatesDir() string {
+	home, _ := os.UserHomeDir()
+	return filepath.Join(home, ".config", "dailyup", "templates")
+}
+
 // Load reads and validates the config file at path.
 func Load(path string) (*Config, error) {
 	path = expandTilde(path)
