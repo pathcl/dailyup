@@ -23,8 +23,9 @@ type Config struct {
 	Email        string   `toml:"email"`         // used for commit author filtering
 	PullRequests bool     `toml:"pull_requests"` // fetch pull requests (default: true)
 	Commits      bool     `toml:"commits"`       // fetch commits (default: true)
-	Area         string   `toml:"area"`          // default area path for create command
-	Sprint       string   `toml:"sprint"`        // default sprint for create command
+	Area          string   `toml:"area"`           // default area path for create command
+	IterationBase string   `toml:"iteration_base"` // base iteration path, e.g. "Company\Team"
+	Sprint        string   `toml:"sprint"`         // sprint leaf name, e.g. "Sprint1"
 }
 
 // DefaultPath returns ~/.config/dailyup/config.toml.
@@ -73,6 +74,19 @@ func Load(path string) (*Config, error) {
 	}
 
 	return &cfg, nil
+}
+
+// BuildIterationPath combines an iteration base and a sprint leaf name.
+// If base is set and leaf is empty, returns base (backlog).
+// If base is empty, returns leaf as-is (full path, legacy behaviour).
+func BuildIterationPath(base, leaf string) string {
+	if base == "" {
+		return leaf
+	}
+	if leaf == "" {
+		return base
+	}
+	return base + `\` + leaf
 }
 
 func expandTilde(path string) string {

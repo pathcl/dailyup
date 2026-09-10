@@ -185,15 +185,18 @@ func runCreate(cmd *cobra.Command, args []string) error {
 	if createArea != "" {
 		area = createArea
 	}
-	sprint := cfg.Sprint
+	sprintLeaf := cfg.Sprint
 	if createSprint != "" {
-		sprint = createSprint
+		sprintLeaf = createSprint
 	}
+	iterationBase := cfg.IterationBase
 
 	if area == "" {
 		return fmt.Errorf("area path required: set 'area' in config or pass --area")
 	}
-	if sprint == "" {
+
+	iterationPath := config.BuildIterationPath(iterationBase, sprintLeaf)
+	if iterationPath == "" {
 		return fmt.Errorf("sprint required: set 'sprint' in config or pass --sprint")
 	}
 
@@ -227,7 +230,7 @@ func runCreate(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("auth: %w", err)
 	}
 
-	newID, err := azdevops.CreateNewWorkItem(client, itemType, title, description, createTags, area, sprint, createParent)
+	newID, err := azdevops.CreateNewWorkItem(client, itemType, title, description, createTags, area, iterationPath, createParent)
 	if err != nil {
 		return fmt.Errorf("create: %w", err)
 	}

@@ -76,6 +76,11 @@ assigned_to  = "@Me"         # Filter by assignee: "@Me" for yourself, or a disp
 # Optional — PR and commit window
 weeks        = 2             # How many weeks back to fetch PRs and commits (default: 2)
 email        = "you@example.com"  # Your email address, used to filter commits by author
+
+# Optional — create command defaults
+area           = 'Company\Team'    # Required for dailyup create
+iteration_base = 'Company\Team'    # Base iteration path; sprint is appended as a leaf name
+sprint         = "Sprint1"         # Sprint leaf name; update each sprint. Omit to land in backlog.
 ```
 
 ### Configuration reference
@@ -90,8 +95,9 @@ email        = "you@example.com"  # Your email address, used to filter commits b
 | `email`         | no       | —       | Your email, used as the commit author filter |
 | `pull_requests` | no       | `true`  | Set to `false` to skip fetching pull requests |
 | `commits`       | no       | `true`  | Set to `false` to skip fetching commits |
-| `area`          | no       | —       | Default area path for `dailyup create` |
-| `sprint`        | no       | —       | Default iteration path for `dailyup create` |
+| `area`           | no  | —  | Default area path for `dailyup create` (required at runtime) |
+| `iteration_base` | no  | —  | Base iteration path, e.g. `Company\Team`; `sprint` is appended as a leaf |
+| `sprint`         | no  | —  | Sprint leaf name, e.g. `Sprint1`; combined with `iteration_base` to build the full path. Omit to land in backlog (uses `iteration_base` alone). Without `iteration_base`, must be the full iteration path. |
 
 ## Usage
 
@@ -196,7 +202,9 @@ Work item IDs are visible in ADO and in the output of `dailyup summary`. Pass `-
 
 `dailyup create` opens your editor (`$VISUAL`, `$EDITOR`, or `vi`) with a template, then creates the work item in ADO when you save and close. Creates a User Story by default; pass `--type` to select the item type.
 
-**Area and sprint are both required** — set them in config or pass `--area` and `--sprint`. They default to the `area` and `sprint` values in your config file and can be overridden per-run with flags.
+**Area is required** — set it in config or pass `--area`.
+
+**Sprint** is the leaf name of the iteration path (e.g. `Sprint1`), combined with `iteration_base` from config to build the full path (`Company\Team\Sprint1`). Pass `--sprint Sprint2` to override for a single run. Omit sprint entirely to land the item in the backlog (`iteration_base` alone). Without `iteration_base` in config, sprint must be the full iteration path and is required.
 
 ```bash
 # Create a User Story (uses area/sprint from config)
@@ -248,6 +256,6 @@ Changes take effect immediately — no rebuild needed.
 | `--task` | no | Shorthand for `--type task` |
 | `--template` | no | Path to a custom editor template file |
 | `--area` | yes* | Area path — overrides config `area` (\*required via flag or config) |
-| `--sprint` | yes* | Iteration path — overrides config `sprint` (\*required via flag or config) |
+| `--sprint` | no | Sprint leaf name (e.g. `Sprint1`) — appended to `iteration_base`. Required if `iteration_base` is not set. Omit to use backlog. |
 | `--tags` | no | Comma-separated tags, e.g. `"backend,infra"` |
 | `--debug` | no | Print raw HTTP requests and responses to stderr |

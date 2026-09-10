@@ -80,3 +80,40 @@ func TestLoad_MissingRequired(t *testing.T) {
 		t.Fatal("expected error when organization/project missing, got nil")
 	}
 }
+
+func TestLoad_IterationBase(t *testing.T) {
+	path := writeTempConfig(t, `
+organization   = "myorg"
+project        = "myproject"
+iteration_base = 'Company\Team'
+sprint         = "Sprint1"
+`)
+	cfg, err := config.Load(path)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if cfg.IterationBase != `Company\Team` {
+		t.Errorf("iteration_base: got %q, want %q", cfg.IterationBase, `Company\Team`)
+	}
+	if cfg.Sprint != "Sprint1" {
+		t.Errorf("sprint: got %q, want %q", cfg.Sprint, "Sprint1")
+	}
+}
+
+func TestBuildIterationPath(t *testing.T) {
+	cases := []struct {
+		base, leaf string
+		want       string
+	}{
+		{`Company\Team`, "Sprint1", `Company\Team\Sprint1`},
+		{`Company\Team`, "", `Company\Team`},
+		{"", `Team\Sprint1`, `Team\Sprint1`},
+		{"", "", ""},
+	}
+	for _, tc := range cases {
+		got := config.BuildIterationPath(tc.base, tc.leaf)
+		if got != tc.want {
+			t.Errorf("BuildIterationPath(%q, %q) = %q, want %q", tc.base, tc.leaf, got, tc.want)
+		}
+	}
+}
