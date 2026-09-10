@@ -189,9 +189,6 @@ func runCreate(cmd *cobra.Command, args []string) error {
 	if createSprint != "" {
 		sprint = createSprint
 	}
-	if area == "" {
-		return fmt.Errorf("area path required: set 'area' in config or pass --area")
-	}
 
 	itemType, err := ItemTypeFromFlag(createType, createTask)
 	if err != nil {

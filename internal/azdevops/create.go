@@ -37,7 +37,9 @@ type relationValue struct {
 func CreateNewWorkItem(c *Client, itemType, title, description, tags, areaPath, iterationPath string, parentID int) (int, error) {
 	ops := []createPatchOp{
 		{Op: "add", Path: "/fields/System.Title", Value: title},
-		{Op: "add", Path: "/fields/System.AreaPath", Value: qualifyPath(c.Project(), areaPath)},
+	}
+	if areaPath != "" {
+		ops = append(ops, createPatchOp{Op: "add", Path: "/fields/System.AreaPath", Value: qualifyPath(c.Project(), areaPath)})
 	}
 	if iterationPath != "" {
 		ops = append(ops, createPatchOp{Op: "add", Path: "/fields/System.IterationPath", Value: qualifyPath(c.Project(), iterationPath)})
