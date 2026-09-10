@@ -38,7 +38,9 @@ func CreateNewWorkItem(c *Client, itemType, title, description, tags, areaPath, 
 	ops := []createPatchOp{
 		{Op: "add", Path: "/fields/System.Title", Value: title},
 		{Op: "add", Path: "/fields/System.AreaPath", Value: qualifyPath(c.Project(), areaPath)},
-		{Op: "add", Path: "/fields/System.IterationPath", Value: qualifyPath(c.Project(), iterationPath)},
+	}
+	if iterationPath != "" {
+		ops = append(ops, createPatchOp{Op: "add", Path: "/fields/System.IterationPath", Value: qualifyPath(c.Project(), iterationPath)})
 	}
 	if description != "" {
 		ops = append(ops, createPatchOp{Op: "add", Path: "/fields/System.Description", Value: description})

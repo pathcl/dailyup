@@ -157,6 +157,26 @@ func TestCreateNewWorkItem_FeatureTypeEncodedInURL(t *testing.T) {
 	}
 }
 
+func TestCreateNewWorkItem_NoIterationPathWhenSprintEmpty(t *testing.T) {
+	var capturedBody []map[string]interface{}
+
+	srv := newMockServer(func(w http.ResponseWriter, r *http.Request) {
+		json.NewDecoder(r.Body).Decode(&capturedBody)
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{"id": 1})
+	})
+	defer srv.Close()
+	c := newClient(t, srv)
+
+	azdevops.CreateNewWorkItem(c, "User Story", "Backlog item", "", "", "Area", "", 0)
+
+	for _, op := range capturedBody {
+		if op["path"] == "/fields/System.IterationPath" {
+			t.Error("IterationPath op should be omitted when sprint is empty")
+		}
+	}
+}
+
 func TestCreateNewWorkItem_NoDescriptionOmitted(t *testing.T) {
 	var capturedBody []map[string]interface{}
 
