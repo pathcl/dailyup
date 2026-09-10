@@ -101,6 +101,46 @@ func TestLoadTemplate_CustomPathTakesPrecedenceOverDir(t *testing.T) {
 	}
 }
 
+func TestMarkdownToHTML(t *testing.T) {
+	cases := []struct {
+		name  string
+		input string
+		want  []string // substrings that must appear in output
+	}{
+		{
+			name:  "heading",
+			input: "## Acceptance Criteria",
+			want:  []string{"<h2>", "Acceptance Criteria", "</h2>"},
+		},
+		{
+			name:  "bullet list",
+			input: "- item one\n- item two",
+			want:  []string{"<ul>", "<li>", "item one", "</li>"},
+		},
+		{
+			name:  "paragraph",
+			input: "As a platform engineer,\nI want capability,\nso that outcome.",
+			want:  []string{"<p>", "As a platform engineer", "</p>"},
+		},
+		{
+			name:  "empty",
+			input: "",
+			want:  []string{},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := cmd.MarkdownToHTML(tc.input)
+			for _, substr := range tc.want {
+				if !strings.Contains(got, substr) {
+					t.Errorf("output missing %q\nfull output: %s", substr, got)
+				}
+			}
+		})
+	}
+}
+
 func TestParseCreateContent(t *testing.T) {
 	cases := []struct {
 		name    string

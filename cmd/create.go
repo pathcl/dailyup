@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -10,6 +11,7 @@ import (
 	"github.com/pathcl/dailyup/internal/config"
 	"github.com/pathcl/dailyup/internal/editor"
 	"github.com/spf13/cobra"
+	"github.com/yuin/goldmark"
 )
 
 var (
@@ -128,6 +130,18 @@ One paragraph: what this delivers and why it matters now.
 `,
 }
 
+// MarkdownToHTML converts Markdown text to HTML for ADO's description field.
+func MarkdownToHTML(md string) string {
+	if md == "" {
+		return ""
+	}
+	var buf bytes.Buffer
+	if err := goldmark.Convert([]byte(md), &buf); err != nil {
+		return md
+	}
+	return buf.String()
+}
+
 // ItemTypeFromFlag maps --type and --task flag values to the ADO work item type
 // string. --type takes precedence over --task when both are set.
 func ItemTypeFromFlag(typeFlag string, taskFlag bool) (string, error) {
@@ -230,7 +244,7 @@ func runCreate(cmd *cobra.Command, args []string) error {
 		return fmt.Errorf("auth: %w", err)
 	}
 
-	newID, err := azdevops.CreateNewWorkItem(client, itemType, title, description, createTags, area, iterationPath, createParent)
+	newID, err := azdevops.CreateNewWorkItem(client, itemType, title, MarkdownToHTML(description), createTags, area, iterationPath, createParent)
 	if err != nil {
 		return fmt.Errorf("create: %w", err)
 	}
