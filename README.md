@@ -196,9 +196,7 @@ Work item IDs are visible in ADO and in the output of `dailyup summary`. Pass `-
 
 `dailyup create` opens your editor (`$VISUAL`, `$EDITOR`, or `vi`) with a template, then creates the work item in ADO when you save and close. Creates a User Story by default; pass `--type` to select the item type.
 
-**Area is required** — set it in config or pass `--area`. Sprint is optional: omit it to send the item straight to the backlog, or set it to land in a specific iteration.
-
-Both default to the `area` and `sprint` values in your config file and can be overridden per-run with flags.
+**Area and sprint are both required** — set them in config or pass `--area` and `--sprint`. They default to the `area` and `sprint` values in your config file and can be overridden per-run with flags.
 
 ```bash
 # Create a User Story (uses area/sprint from config)
@@ -250,6 +248,6 @@ Changes take effect immediately — no rebuild needed.
 | `--task` | no | Shorthand for `--type task` |
 | `--template` | no | Path to a custom editor template file |
 | `--area` | yes* | Area path — overrides config `area` (\*required via flag or config) |
-| `--sprint` | no | Iteration path — overrides config `sprint`; omit to land in backlog |
+| `--sprint` | yes* | Iteration path — overrides config `sprint` (\*required via flag or config) |
 | `--tags` | no | Comma-separated tags, e.g. `"backend,infra"` |
 | `--debug` | no | Print raw HTTP requests and responses to stderr |
